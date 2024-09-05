@@ -1,0 +1,560 @@
+// "use client";
+// import { updateOrderByID, getOrderByID } from "@/app/actions/salesOrders";
+// import DatePicker from "@/app/components/DatePicker";
+// import type { SingleSalesOrder } from "@/app/types/salesOrder";
+// import { cn, type Option } from "@/app/util/utils";
+// import {
+//   Button,
+//   Dropdown,
+//   HelperText,
+//   Input,
+//   Label,
+//   Loading,
+//   Modal,
+//   Notice,
+//   Radio,
+// } from "@atomos_tech/genesis";
+// import { RiEditLine } from "@remixicon/react";
+// import { format, isValid, parse } from "date-fns";
+// import React, {
+//   type ChangeEventHandler,
+//   useEffect,
+//   useMemo,
+//   useState,
+// } from "react";
+// import { Controller, type SubmitHandler, useForm } from "react-hook-form";
+// import type { SalesManager } from "@/app/actions/common";
+// import useSWR, { mutate } from "swr"; // Import SWR
+// import { z } from "zod";
+// import { zodResolver } from "@hookform/resolvers/zod";
+// import { updateOrderOptions } from "./salesSwrOptions";
+
+// interface UpdateOrderDetailsProps {
+//   orderId: string; // Use order ID instead of full order data
+//   salesManager: SalesManager[];
+// }
+
+// const servicesDropdownOptions = [
+//   { label: "B2B", value: "B2B" },
+//   { label: "B2C", value: "B2C" },
+//   { label: "Healthcare", value: "Healthcare" },
+//   { label: "ITDM", value: "ITDM" },
+// ];
+
+// export const updateSalesOrderSchema = z.object({
+//   sales_order_name: z.string().min(1, "Sales Order Name is required"),
+//   sales_order_due_date: z.string().optional(),
+//   sector: z.string().min(1, "Select at least one sector"),
+//   priority: z.string().optional(),
+// });
+
+// const fetchOrder = async (orderId: string) => {
+//   const data = await getOrderByID(orderId);
+//   return data;
+// };
+
+// const UpdateOrderDetails = ({
+//   orderId,
+//   salesManager,
+// }: UpdateOrderDetailsProps) => {
+//   // Fetch order data using SWR
+//   const { data: singleOrder } = useSWR<SingleSalesOrder>(
+//     `/api/orders/${orderId}`,
+//     () => fetchOrder(orderId),
+//     { revalidateOnFocus: false, refreshInterval: 0 }, // Disable auto-revalidation if not needed
+//   );
+
+//   console.log("data", singleOrder);
+
+//   const [showModal, setShowModal] = useState(false);
+//   const [sector, setSector] = useState<Option[]>([]);
+//   const [accountOwner, setAccountOwner] = useState<Option[]>([]);
+//   const [notice, setNotice] = useState<{
+//     open: boolean;
+//     message: string;
+//     title: string;
+//     variant: "success" | "error";
+//   }>({
+//     open: false,
+//     message: "",
+//     title: "",
+//     variant: "success",
+//   });
+
+//   const {
+//     control,
+//     setValue,
+//     register,
+//     reset,
+//     handleSubmit,
+//     formState: { errors, isSubmitting },
+//   } = useForm<SingleSalesOrder>({
+//     resolver: zodResolver(updateSalesOrderSchema),
+//     defaultValues: {
+//       sales_order_name: singleOrder?.sales_order_name || "",
+//       sector: singleOrder?.sector || "",
+//       sales_order_due_date: singleOrder?.sales_order_due_date || "",
+//       priority: singleOrder?.priority || "",
+//     },
+//   });
+
+//   const accountOwnerOptions = useMemo(() => {
+//     return salesManager.map((owner) => ({
+//       label: `${owner.first_name} ${owner.last_name}`,
+//       value: owner._id,
+//     }));
+//   }, [salesManager]);
+
+//   // Date picker for creation date
+//   const [selectedCreationDate, setSelectedCreationDate] = useState<Date>();
+//   const [inputValueCreationDate, setInputValueCreationDate] =
+//     useState<string>("");
+
+//   // Date picker for due date
+//   const [selectedDueDate, setSelectedDueDate] = useState<Date | undefined>(
+//     undefined,
+//   );
+//   const [inputValueDueDate, setInputValueDueDate] = useState<string>("");
+
+//   const handleInputChangeDueDate: ChangeEventHandler<HTMLInputElement> = (
+//     e,
+//   ) => {
+//     const value = e.target.value;
+//     setInputValueDueDate(value);
+//     const date = parse(value, "y-MM-dd", new Date());
+//     setSelectedDueDate(isValid(date) ? date : undefined);
+//   };
+
+//   const creationDate = useMemo(() => {
+//     if (!singleOrder) return new Date(); // Return a default date if singleOrder is undefined
+//     return new Date(singleOrder.sales_order_created_date || "");
+//   }, [singleOrder?.sales_order_created_date]);
+
+//   useEffect(() => {
+//     if (singleOrder) {
+//       // Initialize sector
+//       const initialSector = servicesDropdownOptions.filter(
+//         (option) => option.value === singleOrder.sector,
+//       );
+//       setSector(initialSector);
+
+//       // Initialize creation date
+//       if (singleOrder.sales_order_created_date) {
+//         setSelectedCreationDate(creationDate);
+//         setInputValueCreationDate(format(creationDate, "MMM dd, y"));
+//       }
+
+//       // Initialize due date
+//       if (singleOrder.sales_order_due_date) {
+//         const dueDate = new Date(singleOrder.sales_order_due_date);
+//         setSelectedDueDate(dueDate);
+//         setInputValueDueDate(format(dueDate, "MMM dd, y"));
+//       }
+
+//       // Initialize priority
+//       setValue("priority", singleOrder.priority || "");
+
+//       // Initialize sales manager
+//       const defaultSalesManager = accountOwnerOptions.find(
+//         (option) => option.value === singleOrder.sales_manager?._id,
+//       );
+//       if (defaultSalesManager) {
+//         setAccountOwner([defaultSalesManager]);
+//       }
+//     }
+//   }, [
+//     singleOrder,
+//     setValue,
+//     singleOrder?.sales_manager,
+//     accountOwnerOptions,
+//     creationDate,
+//   ]);
+
+//   useEffect(() => {
+//     if (selectedDueDate) {
+//       setValue("sales_order_due_date", selectedDueDate.toISOString(), {
+//         shouldDirty: true,
+//       });
+//     }
+//   }, [selectedDueDate, setValue]);
+
+//   useEffect(() => {
+//     if (singleOrder) {
+//       reset({
+//         sales_order_name: singleOrder.sales_order_name || "",
+//         sector: singleOrder.sector || "",
+//         sales_order_due_date: singleOrder.sales_order_due_date || "",
+//         priority: singleOrder.priority || "",
+//       });
+//     }
+//   }, [singleOrder, reset]);
+
+//   // with swr
+//   // const onSubmit: SubmitHandler<SingleSalesOrder> = async (data) => {
+//   //   if (selectedDueDate) {
+//   //     data.sales_order_due_date = selectedDueDate.toISOString();
+//   //   } else {
+//   //     data.sales_order_due_date = "";
+//   //   }
+
+//   //   try {
+//   //     await updateOrderByID(orderId, data);
+//   //     await mutate(`/api/orders/${orderId}`, async () => fetchOrder(orderId), {
+//   //       revalidate: true,
+//   //     });
+
+//   //     setNotice({
+//   //       open: true,
+//   //       title: "Order Details Updated Successfully",
+//   //       message: "Changes made are successfully updated",
+//   //       variant: "success",
+//   //     });
+//   //     setShowModal(false);
+//   //   } catch (error) {
+//   //     console.error("Failed to update order details:", error);
+//   //     setNotice({
+//   //       open: true,
+//   //       title: "Error updating order details.",
+//   //       message: "We are running into some problems! Come back later!",
+//   //       variant: "error",
+//   //     });
+//   //     setShowModal(false);
+//   //   }
+//   // };
+
+//   // swr live update test
+
+//   const onSubmit = async (data: SingleSalesOrder) => {
+//     try {
+//       await mutate(
+//         `/api/orders/${orderId}`,
+//         async () => {
+//           const updatedOrder = await updateOrderByID(orderId, data);
+//           return updatedOrder;
+//         },
+//         {
+//           optimisticData: { ...singleOrder, ...data },
+//           rollbackOnError: true,
+//           populateCache: true,
+//           revalidate: false,
+//         }
+//       );
+
+//       setNotice({
+//         open: true,
+//         title: "Order Details Updated Successfully",
+//         message: "Changes made are successfully updated",
+//         variant: "success",
+//       });
+//     } catch (error) {
+//       console.error("Failed to update order details:", error);
+//       setNotice({
+//         open: true,
+//         title: "Error updating order details.",
+//         message: "We are running into some problems! Come back later!",
+//         variant: "error",
+//       });
+//     }
+//   };
+
+//   return (
+//     <>
+//     //   <RiEditLine size={20} onClick={() => setShowModal(true)} />
+//     //   <div className="relative z-[2000]">
+//     //     <Notice
+//     //       open={notice.open}
+//     //       setOpen={(open: boolean) => setNotice((prev) => ({ ...prev, open }))}
+//     //       variant={notice.variant}
+//     //       noticeTitle={notice.title}
+//     //       position="top"
+//     //     >
+//     //       {notice.message}
+//     //     </Notice>
+//     //   </div>
+//     //   <Modal
+//     //     showModal={showModal}
+//     //     setShowModal={setShowModal}
+//     //     closeModal={true}
+//     //   >
+//     //     <form
+//     //       onSubmit={handleSubmit(onSubmit)}
+//     //       className="w-[710px] h-[583px] flex flex-col relative justify-between"
+//     //     >
+//     //       <div className="pb-[18px] border-b border-gray-200 sticky top-0 bg-gray-25 w-full">
+//     //         <h3 className="text-lg p-0 font-semibold text-gray-800">
+//     //           Order Details
+//     //         </h3>
+//     //       </div>
+//     //       <div className="overflow-y-auto flex flex-col gap-6 w-full">
+//     //         {/ Order Information /}
+//     //         <div className="py-[18px] px-1.5">
+//     //           <div className="pb-3 border-b border-gray-200">
+//     //             <h4 className="font-medium">Order Information</h4>
+//     //           </div>
+//     //           <div className="pt-3 flex flex-col gap-[18px]">
+//     //             {/ Sales Order Name /}
+//     //             <div className="flex items-center justify-between gap-2">
+//     //               <Label size={"md"} required>
+//     //                 Sales Order Name
+//     //               </Label>
+//     //               <div className="max-w-[455px] w-full">
+//     //                 <Input
+//     //                   defaultValue={singleOrder?.sales_order_name}
+//     //                   type="text"
+//     //                   className={cn(
+//     //                     errors.sales_order_name && "border-error-500",
+//     //                   )}
+//     //                   {...register("sales_order_name")}
+//     //                 />
+//     //                 {errors.sales_order_name && (
+//     //                   <HelperText size="sm" className="text-red-500">
+//     //                     {errors.sales_order_name.message}
+//     //                   </HelperText>
+//     //                 )}
+//     //               </div>
+//     //             </div>
+//     //             {/ Client Name /}
+//     //             <div className="flex items-center justify-between gap-2">
+//     //               <Label size={"md"} required disabled>
+//     //                 Client Name
+//     //               </Label>
+//     //               <div className="max-w-[455px] w-full">
+//     //                 <Input
+//     //                   type="text"
+//     //                   defaultValue={singleOrder.account_name}
+//     //                   disabled
+//     //                 />
+//     //                 {errors.account_name && (
+//     //                   <HelperText size="sm" className="text-red-500">
+//     //                     {errors.account_name.message}
+//     //                   </HelperText>
+//     //                 )}
+//     //               </div>
+//     //             </div>
+//     //             {/ Sector /}
+//     //             <div className="flex items-center justify-between gap-2">
+//     //               <Label size={"md"} required>
+//     //                 Sector
+//     //               </Label>
+//     //               <div className="max-w-[455px] w-full">
+//     //                 <Controller
+//     //                   name="sector"
+//     //                   control={control}
+//     //                   defaultValue={singleOrder?.sector || ""}
+//     //                   render={({ field: { onChange, value } }) => (
+//     //                     <Dropdown
+//     //                       options={servicesDropdownOptions}
+//     //                       selected={
+//     //                         sector.length > 0
+//     //                           ? sector // Use the sector state if already selected
+//     //                           : servicesDropdownOptions.filter(
+//     //                               (option) => option.value === value, // Set the selected option based on the current value
+//     //                             )
+//     //                       }
+//     //                       setSelected={(option) => {
+//     //                         let selectedOption: Option | null = null;
+//     //                         if (Array.isArray(option)) {
+//     //                           selectedOption = option[0];
+//     //                         } else if (
+//     //                           typeof option === "object" &&
+//     //                           option !== null
+//     //                         ) {
+//     //                           selectedOption = option;
+//     //                         }
+//     //                         if (selectedOption) {
+//     //                           setSector([selectedOption]); // Update the sector state
+//     //                           const selectedValue = selectedOption.value;
+//     //                           onChange(selectedValue); // Update the form field value in react-hook-form
+//     //                           setValue("sector", selectedValue); // Ensure the form's sector value is updated
+//     //                         }
+//     //                       }}
+//     //                       multiple={false} // Ensure Dropdown allows only single selection
+//     //                     />
+//     //                   )}
+//     //                 />
+//     //                 {errors.sector && (
+//     //                   <HelperText size="sm" className="text-red-500">
+//     //                     {errors.sector.message}
+//     //                   </HelperText>
+//     //                 )}
+//     //               </div>
+//     //             </div>
+
+//     //             {/ Creation Date /}
+//     //             <div className="flex items-center justify-between gap-2">
+//     //               <Label size={"md"} disabled>
+//     //                 Creation Date
+//     //               </Label>
+//     //               <div className="max-w-[455px] w-full">
+//     //                 <DatePicker
+//     //                   selected={selectedCreationDate}
+//     //                   setSelected={setSelectedCreationDate}
+//     //                   inputValue={inputValueCreationDate}
+//     //                   setInputValue={setInputValueCreationDate}
+//     //                   disabled
+//     //                 />
+//     //                 {errors.sales_order_created_date && (
+//     //                   <HelperText size="sm" className="text-red-500">
+//     //                     {errors.sales_order_created_date.message}
+//     //                   </HelperText>
+//     //                 )}
+//     //               </div>
+//     //             </div>
+//     //             {/ Due Date /}
+//     //             <div className="flex items-center justify-between gap-2">
+//     //               <Label size={"md"}>Due Date</Label>
+//     //               <div className="max-w-[455px] w-full">
+//     //                 <DatePicker
+//     //                   selected={selectedDueDate}
+//     //                   setSelected={setSelectedDueDate}
+//     //                   inputValue={inputValueDueDate}
+//     //                   disabledCalendar={{ before: creationDate }}
+//     //                   setInputValue={setInputValueDueDate}
+//     //                   handleInputChange={handleInputChangeDueDate}
+//     //                 />
+//     //                 {errors.sales_order_due_date && (
+//     //                   <HelperText size="sm" className="text-red-500">
+//     //                     {errors.sales_order_due_date.message}
+//     //                   </HelperText>
+//     //                 )}
+//     //               </div>
+//     //             </div>
+//     //             {/ Priority /}
+//     //             <div className="flex items-center justify-between gap-2">
+//     //               <Label size={"md"}>Priority</Label>
+//     //               <Controller
+//     //                 name="priority"
+//     //                 control={control}
+//     //                 render={({ field }) => (
+//     //                   <div className="max-w-[455px] flex items-center gap-[35px] px-2 w-full">
+//     //                     <div className="flex items-center gap-2">
+//     //                       <Radio
+//     //                         size="lg"
+//     //                         id="high"
+//     //                         name="priority"
+//     //                         value="High"
+//     //                         checked={field.value === "High"}
+//     //                         onChange={(e) => field.onChange(e.target.value)}
+//     //                       />
+//     //                       <Label htmlFor="high" className="text-gray-500">
+//     //                         High
+//     //                       </Label>
+//     //                     </div>
+//     //                     <div className="flex items-center gap-2">
+//     //                       <Radio
+//     //                         size="lg"
+//     //                         id="medium"
+//     //                         name="priority"
+//     //                         value="Medium"
+//     //                         checked={field.value === "Medium"}
+//     //                         onChange={(e) => field.onChange(e.target.value)}
+//     //                       />
+//     //                       <Label htmlFor="medium" className="text-gray-500">
+//     //                         Medium
+//     //                       </Label>
+//     //                     </div>
+//     //                     <div className="flex items-center gap-2">
+//     //                       <Radio
+//     //                         size="lg"
+//     //                         id="low"
+//     //                         name="priority"
+//     //                         value="Low"
+//     //                         checked={field.value === "Low"}
+//     //                         onChange={(e) => field.onChange(e.target.value)}
+//     //                       />
+//     //                       <Label htmlFor="low" className="text-gray-500">
+//     //                         Low
+//     //                       </Label>
+//     //                     </div>
+//     //                   </div>
+//     //                 )}
+//     //               />
+//     //               {errors.priority && (
+//     //                 <HelperText size="sm" className="text-red-500">
+//     //                   {errors.priority.message}
+//     //                 </HelperText>
+//     //               )}
+//     //             </div>
+//     //           </div>
+//     //         </div>
+//     //         {/ Sales Person Information /}
+//     //         <div className="py-[18px] px-1.5">
+//     //           <div className="pb-3 border-b border-gray-200">
+//     //             <h4 className="font-medium">Sales Person Information</h4>
+//     //           </div>
+//     //           <div className="pt-3 flex flex-col gap-[18px]">
+//     //             {/ Sales Person /}
+//     //             <div className="flex items-center justify-between gap-2">
+//     //               <Label size={"md"} required>
+//     //                 Sales Person
+//     //               </Label>
+//     //               <div className="max-w-[455px] w-full">
+//     //                 <Controller
+//     //                   name="sales_manager"
+//     //                   control={control}
+//     //                   defaultValue={
+//     //                     singleOrder.sales_manager
+//     //                       ? singleOrder.sales_manager
+//     //                       : { _id: "" }
+//     //                   }
+//     //                   render={({ field: { onChange } }) => (
+//     //                     <Dropdown
+//     //                       options={accountOwnerOptions}
+//     //                       selected={accountOwner}
+//     //                       position="bottom"
+//     //                       setSelected={(option) => {
+//     //                         const selectedOption = Array.isArray(option)
+//     //                           ? option[0]
+//     //                           : option;
+//     //                         if (selectedOption && "value" in selectedOption) {
+//     //                           setAccountOwner([selectedOption]);
+//     //                           onChange({ _id: selectedOption.value });
+//     //                         }
+//     //                       }}
+//     //                       search={true}
+//     //                       multiple={false}
+//     //                     />
+//     //                   )}
+//     //                 />
+//     //                 {errors.sales_manager && (
+//     //                   <HelperText size="sm" className="text-red-500">
+//     //                     {errors.sales_manager.message}
+//     //                   </HelperText>
+//     //                 )}
+//     //               </div>
+//     //             </div>
+//     //           </div>
+//     //         </div>
+//     //       </div>
+//     //       <div className="pt-[18px] border-t border-gray-200 sticky bottom-0 bg-gray-25 w-full flex items-center justify-end gap-2">
+//     //         <Button
+//     //           size={"sm"}
+//     //           intent={"default-outlined"}
+//     //           variant={"outlined"}
+//     //           onClick={() => setShowModal(false)}
+//     //         >
+//     //           Cancel
+//     //         </Button>
+//     //         <Button
+//     //           size={"sm"}
+//     //           intent={"primary"}
+//     //           variant={"filled"}
+//     //           type="submit"
+//     //           disabled={isSubmitting}
+//     //         >
+//     //           {isSubmitting ? (
+//     //             <>
+//     //               Save <Loading height="10px" variant="light" width="10px" />
+//     //             </>
+//     //           ) : (
+//     //             "Save"
+//     //           )}
+//     //         </Button>
+//     //       </div>
+//     //     </form>
+//     //   </Modal>
+//     </>
+//   );
+// };
+
+// export default UpdateOrderDetails;
